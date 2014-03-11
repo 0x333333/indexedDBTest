@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/1.8.3/jquery.min.js"></script>
+    <script type="text/javascript" src="IndexedDBShim/dist/IndexedDBShim.min.js"></script>
+  </head>
+  <body>
+    <form id="register-form">
+      <table>
+        <tbody>
+          <tr>
+            <td>
+              <label for="pub-title" class="required">
+                Title:
+              </label>
+            </td>
+            <td>
+              <input type="text" id="pub-title" name="pub-title" />
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <label for="pub-id" class="required">
+                ID:<br/>
+              </label>
+            </td>
+            <td>
+              <input type="text" id="pub-id" name="pub-id"/>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="button-pane">
+        <input type="button" id="add-button" value="Add Publication" />
+      </div>
+    </form>
+
+    <form id="delete-form">
+      <table>
+        <tbody>
+          <tr>
+            <td>
+              <label for="pub-id-to-delete">
+                ID:<br/>
+              </label>
+            </td>
+            <td>
+              <input type="text" id="pub-id-to-delete" name="pub-id-to-delete" />
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <label for="key-to-delete">
+                Key:<br/>
+                <span class="note">(for example 1, 2, 3, etc.)</span>
+              </label>
+            </td>
+            <td>
+              <input type="text" id="key-to-delete"
+              name="key-to-delete" />
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="button-pane">
+        <input type="button" id="delete-button" value="Delete Publication" />
+        <input type="button" id="clear-store-button"
+        value="Clear the whole store" class="destructive" />
+      </div>
+    </form>
+
+    <form id="search-form">
+      <div class="button-pane">
+        <input type="button" id="show-list-button"
+        value="List database content" />
+      </div>
+    </form>
+    
+    <div>
+      <ul id="pub-list">
+      </ul>
+    </div>
+
+    <script type="text/javascript">
+    (function () {
+
+    	// In the following line, you should include the prefixes of implementations you want to test.
+    	if (typeof window.mozIndexedDB !== "undefined") {
+				window.indexedDB = window.mozIndexedDB;
+			}
+			else {
+				window.indexedDB = window.shimIndexedDB;
+				window.shimIndexedDB.__useShim();
+				window.shimIndexedDB.__debug(true);
+				console.log("Starting Tests with shimIndexedDB");
+			}
+			// window.indexedDB = window.indexedDB || window.mozIndexedDB || window.webkitIndexedDB || window.msIndexedDB;
+			window.IDBTransaction = window.IDBTransaction || window.webkitIDBTransaction || window.msIDBTransaction;
+			window.IDBKeyRange = window.IDBKeyRange || window.webkitIDBKeyRange || window.msIDBKeyRange;
+
+      var DB_NAME = 'mdn-demo-indexeddb-epublications';
+      var DB_VERSION = 1; // Use a long long for this value (don't use a float)
+      var DB_STORE_NAME = 'publications';
+      
+      var db;
+      
+      // Used to keep track of which view is displayed to avoid uselessly reloading it
+      var current_view_pub_key;
+
+      // Open database
+      function openDataBase() {
+        console.log("openDataBase ...");
+        var request = window.indexedDB.open(DB_NAME);
+        request.onsuccess = function (event) {
+          db = this.result;
+          console.log(db);
+          console.log("openDataBase DONE");
+        };
+
+
+        request.onerror = function (event) {
+          console.error("openDataBase:", event.target.errorCode);
+        };
+
+        request.onupgradeneeded = function (event) {
+          console.log("openDataBase.onupgradeneeded");
+          var store = event.currentTarget.result.createObjectStore(
+            DB_STORE_NAME, { 
+              keyPath: 'id', 
+              autoIncrement: false
+            }
+          );
+          store.createIndex('id', 'id', { unique: true });
+          store.createIndex('title', 'title', { unique: false });
+        };
+      }
+
+      function getAll(store_name, mode) {
+        var tx = db.transaction(store_name, mode);
+        return tx.objectStore(store_name);
+      }
+
+      function deleteAll(store_name) {
+        // get all
+        var store = getAll(DB_STORE_NAME, 'readwrite');
+        
+        // clear all
+        var request = store.clear();
+
+        request.onsuccess = function(event) {
+          // display list
+          displayAll(store);
+        };
+
+        request.onerror = function (event) {
+          console.error("deleteAll:", event.target.errorCode);
+          displayActionFailure(this.error);
+        };
+      }
+
+      function displayAll(store) {
+        console.log("displayAll");
+
+        if (typeof store == 'undefined')
+          store = getAll(DB_STORE_NAME, 'readonly');
+        
+        // clear list
+        var record_list = $('#pub-list');
+        record_list.empty();
+
+        // get number of records
+        var request = store.count();
+        request.onsuccess = function(event) {
+          console.log('There are ' + event.target.result +
+                      ' record(s) in the object store.');
+        };
+        request.onerror = function(event) {
+          console.error("add error", this.error);
+          displayActionFailure(this.error);
+        };
+        
+        // get cursor in order to look up all these records
+        request = store.openCursor();
+        request.onsuccess = function(event) {
+          var cursor = event.target.result;
+          // If there are record(s)
+          if (cursor) {
+            // console.log("displayAll cursor:", cursor);
+            request = store.get(cursor.key);
+            request.onsuccess = function (event) {
+              var value = event.target.result;
+              var list_item = $('<li>' +
+                                  '[' + cursor.key + '] ' +
+                                  '(id: ' + value.id + ') ' +
+                                  value.title +
+                                '</li>');
+
+              record_list.append(list_item);
+            };
+            // Move on to the next object in store
+            cursor.continue();
+            // This counter serves only to create distinct ids
+          } else {
+            console.log("No more entries");
+          }
+        };
+      }
+
+      function addRecord(id, title) {
+        console.log("addRecord arguments:", arguments);
+        
+        // construct record
+        var obj = { id: id, title: title };
+        
+        // get all records
+        var store = getAll(DB_STORE_NAME, 'readwrite');
+        
+        // try to add record
+        var request;
+        try {
+          request = store.add(obj);
+        } catch (e) {
+          throw e;
+        }
+        request.onsuccess = function (event) {
+          console.log("Insertion in DB successful");
+          displayAll(store);
+        };
+        request.onerror = function() {
+          console.error("addRecord error", this.error);
+          displayActionFailure(this.error);
+        };
+      }
+
+      function deleteRecord(id) {
+        console.log("deletePublication:", arguments);
+
+        // get all records
+        var store = getAll(DB_STORE_NAME, 'readwrite');
+
+        // get the record to delete
+        console.log(store);
+        var request = store.index('id');
+
+        request.get(id).onsuccess = function(event) {
+          if (typeof event.target.result == 'undefined') {
+            displayActionFailure("No matching record found");
+            return;
+          }
+          deleteRecrodByKey(event.target.result.id, store);
+        };
+        request.onerror = function (event) {
+          console.error("deleteRecord:", event.target.errorCode);
+        };
+      }
+
+      function deleteRecrodByKey(key, store) {
+        console.log("deleteRecrodByKey:", arguments);
+        if (typeof store == 'undefined')
+          store = getAll(DB_STORE_NAME, 'readwrite');
+
+        // get the record to delete
+        var request = store.get(key);
+        request.onsuccess = function(event) {
+          var record = event.target.result;
+          if (typeof record == 'undefined') {
+            displayActionFailure("No matching record found");
+            return;
+          }
+
+          // delete
+          request = store.delete(key);
+          request.onsuccess = function(event) {
+            displayActionSuccess("Deletion successful");
+            displayAll(store);
+          };
+          request.onerror = function (event) {
+            console.error("deleteRecrodByKey:", event.target.errorCode);
+          };
+        };
+        request.onerror = function (event) {
+          console.error("deleteRecrodByKey:", event.target.errorCode);
+        };
+      }
+      
+      function displayActionSuccess(msg) {
+      	console.log(msg);
+      }
+      
+      function displayActionFailure(msg) {
+        console.log(msg);
+      }
+      
+      function addEventListeners() {
+        console.log("addEventListeners");
+
+        // Add button clicked
+        $('#add-button').click(function(event) {
+          console.log("add ...");
+          var title = $('#pub-title').val();
+          var id = $('#pub-id').val();
+          
+          if (!title || !id) {
+            displayActionFailure("Required field(s) missing");
+            return;
+          }
+          
+          // add
+          addRecord(id, title);
+        });
+
+        // Delete button clicked
+        $('#delete-button').click(function(event) {
+          console.log("delete ...");
+          var id = $('#pub-id-to-delete').val();
+          var key = $('#key-to-delete').val();
+
+          if (id != '') {
+            deleteRecord(id);
+          } else if (key != '') {
+            // Better use Number.isInteger if the engine has EcmaScript 6
+              if (key == '' || isNaN(key))  {
+              displayActionFailure("Invalid key");
+              return;
+            }
+            key = Number(key);
+
+            // delete
+            deleteRecrodByKey(key);
+          }
+        });
+
+
+        // Delete all button clicked
+        $('#clear-store-button').click(function(event) {
+          deleteAll();
+        });
+
+        // Show all list button click
+        $('#show-list-button').click(function(event) {
+          displayAll();
+        });
+      }
+
+      // Open database
+      openDataBase();
+
+      // Add event listeners
+      addEventListeners();
+    })();
+
+    </script>
+  </body>
+</html>
