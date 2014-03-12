@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/1.8.3/jquery.min.js"></script>
+    <script type="text/javascript" src="sampleData.js"></script>
+    <script type="text/javascript" src="IndexedDBShim/dist/IndexedDBShim.min.js"></script>
+    <script type="text/javascript">
+    
+    function startTests(){
+      if (typeof window.mozIndexedDB !== "undefined") {
+        window.indexedDB = window.mozIndexedDB;
+      }
+      else {
+        window.indexedDB = window.shimIndexedDB;
+        window.shimIndexedDB.__useShim();
+        window.shimIndexedDB.__debug(true);
+        console.log("Starting Tests with shimIndexedDB");
+      }
+
+      var dbVersion = 1;
+
+      // Create database
+      var dbOpenRequest = window.indexedDB.open(DB.NAME, ++dbVersion);
+      dbOpenRequest.onsuccess = function(e){
+        console.log(true, "Database Opened successfully");
+        console.log("Database opened successfully with version " + dbOpenRequest.result.version);
+      };
+      dbOpenRequest.onerror = function(e){
+        console.log(false, "Database NOT Opened successfully");
+        console.log("Database NOT opened successfully");
+      };
+      dbOpenRequest.onupgradeneeded = function(e){
+        console.log(true, "Database Upgraded successfully");
+        console.log("Database upgrade called");
+        var db = dbOpenRequest.result;
+        db.createObjectStore(DB.OBJECT_STORE_1, {
+            "keyPath": "Int",
+            "autoIncrement": false
+        });
+        db.createObjectStore(DB.OBJECT_STORE_2, {
+            "keyPath": "Int",
+            "autoIncrement": true
+        });
+
+        db.deleteObjectStore(DB.OBJECT_STORE_2);
+
+      };
+      dbOpenRequest.onblocked = function(){
+        console.log(false, "Database open is now blocked");
+        console.log("Database open blocked");
+      };
+
+    }
+
+    </script>
+  </head>
+  <body onload="startTests()">
+    <form id="register-form">
+      <table>
+        <tbody>
+          <tr>
+            <td>
+              <label for="pub-title" class="required">
+                Title:
+              </label>
+            </td>
+            <td>
+              <input type="text" id="pub-title" name="pub-title" />
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <label for="pub-id" class="required">
+                ID:<br/>
+              </label>
+            </td>
+            <td>
+              <input type="text" id="pub-id" name="pub-id"/>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="button-pane">
+        <input type="button" id="add-button" value="Add Publication" />
+      </div>
+    </form>
+
+    <hr/>
+
+    <form id="delete-form">
+      <table>
+        <tbody>
+          <tr>
+            <td>
+              <label for="pub-id-to-delete">
+                ID:<br/>
+              </label>
+            </td>
+            <td>
+              <input type="text" id="pub-id-to-delete" name="pub-id-to-delete" />
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <label for="key-to-delete">
+                Key:<br/>
+                <span class="note">(for example 1, 2, 3, etc.)</span>
+              </label>
+            </td>
+            <td>
+              <input type="text" id="key-to-delete"
+              name="key-to-delete" />
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="button-pane">
+        <input type="button" id="delete-button" value="Delete Publication" />
+        <input type="button" id="clear-store-button"
+        value="Clear the whole store" class="destructive" />
+      </div>
+    </form>
+
+    <hr/>
+
+    <form id="search-form">
+      <div class="button-pane">
+        <input type="button" id="show-list-button"
+        value="List database content" />
+      </div>
+    </form>
+
+    <hr/>
+    
+    <div>
+      <ul id="pub-list">
+      </ul>
+    </div>
+
+
+  </body>
+</html>
