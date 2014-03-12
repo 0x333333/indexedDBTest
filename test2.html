@@ -5,8 +5,13 @@
     <script type="text/javascript" src="sampleData.js"></script>
     <script type="text/javascript" src="IndexedDBShim/dist/IndexedDBShim.min.js"></script>
     <script type="text/javascript">
+
+    var db, store;
     
     function startTests(){
+
+      addEventListeners();
+
       if (typeof window.mozIndexedDB !== "undefined") {
         window.indexedDB = window.mozIndexedDB;
       }
@@ -17,44 +22,131 @@
         console.log("Starting Tests with shimIndexedDB");
       }
 
-      var dbVersion = 1;
+      // window.indexedDB = window.indexedDB || window.mozIndexedDB || window.webkitIndexedDB || window.msIndexedDB || window.shimIndexedDB;
 
       // Create database
-      var dbOpenRequest = window.indexedDB.open(DB.NAME, ++dbVersion);
+      var dbOpenRequest = window.indexedDB.open('library');
+
       dbOpenRequest.onsuccess = function(e){
-        console.log(true, "Database Opened successfully");
-        console.log("Database opened successfully with version " + dbOpenRequest.result.version);
+        console.log("Database Opened successfully");
+        db = dbOpenRequest.result;
       };
-      dbOpenRequest.onerror = function(e){
-        console.log(false, "Database NOT Opened successfully");
-        console.log("Database NOT opened successfully");
-      };
+      
       dbOpenRequest.onupgradeneeded = function(e){
-        console.log(true, "Database Upgraded successfully");
-        console.log("Database upgrade called");
-        var db = dbOpenRequest.result;
-        db.createObjectStore(DB.OBJECT_STORE_1, {
-            "keyPath": "Int",
-            "autoIncrement": false
-        });
-        db.createObjectStore(DB.OBJECT_STORE_2, {
-            "keyPath": "Int",
-            "autoIncrement": true
+        console.log("Database Upgraded successfully");
+        db = dbOpenRequest.result;
+        store = db.createObjectStore('books', {
+          keyPath: "isbn",
+          "autoIncrement": false
         });
 
-        db.deleteObjectStore(DB.OBJECT_STORE_2);
+        var titleIndex = store.createIndex("by_title", "title", {unique: true});
+        var authorIndex = store.createIndex("by_author", "author");
+      };
+    }
 
+    function loadData() {
+      var tx = db.transaction('books', 'readwrite');
+      store = tx.objectStore('books');
+
+      var request;
+      try {
+        var obj = {title: randomChar(30), author: randomChar(8), isbn: Math.floor(Math.random()*1000000)};
+        request = store.put(obj);
+      } catch (e) {
+        throw e;
+      }
+
+      request.onsuccess = function (event) {
+        console.log("Insertion in DB successful");
       };
-      dbOpenRequest.onblocked = function(){
-        console.log(false, "Database open is now blocked");
-        console.log("Database open blocked");
+    }
+
+    function showAll() {
+      console.log('Show all data');
+
+      // bind data list html tag
+      var record_list = $('#data-list');
+      record_list.empty();
+
+      var tx = db.transaction('books', 'readwrite');
+      store = tx.objectStore("books");
+
+      var request = store.count();
+      request.onsuccess = function(event) {
+        console.log('There are ' + event.target.result +
+                    ' record(s) in the object store.');
       };
+
+      // get cursor in order to look up all these records
+      request = store.openCursor();
+      request.onsuccess = function(event) {
+        var cursor = event.target.result;
+        // If there are record(s)
+        if (cursor) {
+          // console.log("displayAll cursor:", cursor);
+          request = store.get(cursor.key);
+          request.onsuccess = function (event) {
+            var value = event.target.result;
+            console.log(value);
+            var list_item = $('<li>' +
+                                '[' + cursor.key + '] ' +
+                                '<strong>' + value.title + '</strong>, ' +
+                                value.author +
+                              '</li>');
+
+            record_list.append(list_item);
+          };
+          // Move on to the next object in store
+          cursor.continue();
+          // This counter serves only to create distinct ids
+        } else {
+          console.log("No more entries");
+        }
+      };
+    }
+
+    function deleteAll() {
+      console.log('Delete all data');
+    }
+
+
+
+    function randomChar(l) {
+      var x=" qwert yuio plk jhg fds azxcv bnm ";
+      var tmp="";
+      for(var i=0; i<l; i++) {
+        tmp += x.charAt(Math.ceil(Math.random()*100000000)%x.length);
+      }
+      return tmp;
+    }
+
+    function addEventListeners() {
+      console.log('addEventListeners');
+
+      $('#add-button').click(function(event) {
+        loadData();
+      });
+
+      $('#all-button').click(function(event) {
+        showAll();
+      });
+
+      $('#clear-button').click(function(event) {
+        deleteAll();
+      });
 
     }
 
     </script>
   </head>
   <body onload="startTests()">
+
+    <input type="button" id="add-button" value="Load data" />
+    <input type="button" id="all-button" value="Show all data" />
+    <input type="button" id="clear-button" value="Delete all data" />
+
+
     <form id="register-form">
       <table>
         <tbody>
@@ -133,7 +225,7 @@
     <hr/>
     
     <div>
-      <ul id="pub-list">
+      <ul id="data-list">
       </ul>
     </div>
 

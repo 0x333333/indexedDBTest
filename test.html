@@ -85,16 +85,16 @@
     (function () {
 
     	// In the following line, you should include the prefixes of implementations you want to test.
-    	if (typeof window.mozIndexedDB !== "undefined") {
-				window.indexedDB = window.mozIndexedDB;
-			}
-			else {
-				window.indexedDB = window.shimIndexedDB;
-				window.shimIndexedDB.__useShim();
-				window.shimIndexedDB.__debug(true);
-				console.log("Starting Tests with shimIndexedDB");
-			}
-			// window.indexedDB = window.indexedDB || window.mozIndexedDB || window.webkitIndexedDB || window.msIndexedDB;
+   //  	if (typeof window.mozIndexedDB !== "undefined") {
+			// 	window.indexedDB = window.mozIndexedDB;
+			// }
+			// else {
+			// 	window.indexedDB = window.shimIndexedDB;
+			// 	window.shimIndexedDB.__useShim();
+			// 	window.shimIndexedDB.__debug(true);
+			// 	console.log("Starting Tests with shimIndexedDB");
+			// }
+			window.indexedDB = window.indexedDB || window.mozIndexedDB || window.webkitIndexedDB || window.msIndexedDB;
 			window.IDBTransaction = window.IDBTransaction || window.webkitIDBTransaction || window.msIDBTransaction;
 			window.IDBKeyRange = window.IDBKeyRange || window.webkitIDBKeyRange || window.msIDBKeyRange;
 
