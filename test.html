@@ -269,6 +269,7 @@
           }
 
           // delete
+          console.log('key: ', key);
           request = store.delete(key);
           request.onsuccess = function(event) {
             displayActionSuccess("Deletion successful");
