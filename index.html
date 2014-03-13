@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/1.8.3/jquery.min.js"></script>
+    <script type="text/javascript" src="IndexedDBShim.min.js"></script>
+    <!-- Latest compiled and minified CSS -->
+    <link rel="stylesheet" href="//netdna.bootstrapcdn.com/bootstrap/3.1.1/css/bootstrap.min.css">
+    <link rel="stylesheet" href="//netdna.bootstrapcdn.com/bootstrap/3.1.1/css/bootstrap-theme.min.css">
+    <script src="//netdna.bootstrapcdn.com/bootstrap/3.1.1/js/bootstrap.min.js"></script>
+
+    <script type="text/javascript">
+
+    var db, store;
+    
+    function startTests(){
+
+      addEventListeners();
+
+      if (typeof window.mozIndexedDB !== "undefined") {
+        window.indexedDB = window.mozIndexedDB;
+      }
+      else {
+        window.indexedDB = window.shimIndexedDB;
+        window.shimIndexedDB.__useShim();
+        window.shimIndexedDB.__debug(true);
+        console.log("Starting Tests with shimIndexedDB");
+      }
+
+      // window.indexedDB = window.indexedDB || window.mozIndexedDB || window.webkitIndexedDB || window.msIndexedDB || window.shimIndexedDB;
+
+      // Create database
+      var dbOpenRequest = window.indexedDB.open('library');
+
+      dbOpenRequest.onsuccess = function(e){
+        console.log("Database Opened successfully");
+        db = dbOpenRequest.result;
+      };
+      
+      dbOpenRequest.onupgradeneeded = function(e){
+        console.log("Database Upgraded successfully");
+        db = dbOpenRequest.result;
+        store = db.createObjectStore('books', {
+          keyPath: "isbn",
+          "autoIncrement": false
+        });
+
+        var isbnIndex = store.createIndex("by_isbn", "isbn", {unique: true});
+        var titleIndex = store.createIndex("by_title", "title");
+        var authorIndex = store.createIndex("by_author", "author");
+
+        store.put({title: "Quarry Memories", author: "Fred", isbn: 123456});
+        store.put({title: "Water Buffaloes", author: "Fred", isbn: 234567});
+        store.put({title: "Bedrock Nights", author: "Barney", isbn: 345678});
+
+      };
+    }
+
+    function loadData() {
+      var tx = db.transaction('books', 'readwrite');
+      store = tx.objectStore('books');
+
+      var request;
+      try {
+        var obj = {title: randomChar(30), author: randomChar(8), isbn: Math.floor(Math.random()*1000000)};
+        request = store.put(obj);
+      } catch (e) {
+        throw e;
+      }
+
+      request.onsuccess = function (event) {
+        showAll();
+        console.log("Insertion in DB successful");
+      };
+    }
+
+    function showAll() {
+      console.log('Show all data');
+
+      // bind data list html tag
+      var record_list = $('#data-list');
+      record_list.empty();
+
+      var tx = db.transaction('books', 'readwrite');
+      store = tx.objectStore("books");
+
+      var request = store.count();
+      request.onsuccess = function(event) {
+        console.log('There are ' + event.target.result +
+                    ' record(s) in the object store.');
+      };
+
+      // get cursor in order to look up all these records
+      request = store.openCursor();
+      request.onsuccess = function(event) {
+        var cursor = event.target.result;
+        // If there are record(s)
+        if (cursor) {
+          // console.log("displayAll cursor:", cursor);
+          request = store.get(cursor.key);
+          request.onsuccess = function (event) {
+            var value = event.target.result;
+            // console.log(value);
+            var list_item = $('<tr>' +
+                                '<td>' + cursor.key + '</td>' +
+                                '<td>' + value.title + '</td>' +
+                                '<td>' + value.author + '</td>' +
+                              '</tr>');
+
+            record_list.append(list_item);
+          };
+          // Move on to the next object in store
+          cursor.continue();
+          // This counter serves only to create distinct ids
+        } else {
+          console.log("No more entries");
+        }
+      };
+    }
+
+    function deleteAll() {
+      console.log('Delete all data');
+      var tx = db.transaction('books', 'readwrite');
+      store = tx.objectStore('books');
+
+      var request = store.clear();
+
+      request.onsuccess = function(event) {
+        // display list
+        showAll();
+        console.log('Data clear successfully.');
+      };
+    }
+
+    function deleteByISBN(id) {
+      console.log('Delete by ISBN');
+      var tx = db.transaction('books', 'readwrite');
+      store = tx.objectStore('books');
+
+      var request = store.delete(parseInt(id));
+      request.onsuccess = function(event) {
+        showAll();
+        console.log('Delete successfully.');
+      };
+    }
+
+
+
+    function randomChar(l) {
+      var x=" qwert yuio plk jhg fds azxcv bnm ";
+      var tmp="";
+      for(var i=0; i<l; i++) {
+        tmp += x.charAt(Math.ceil(Math.random()*100000000)%x.length);
+      }
+      return tmp;
+    }
+
+    function addEventListeners() {
+      console.log('addEventListeners');
+
+      $('#add-button').click(function(event) {
+        loadData();
+      });
+
+      $('#all-button').click(function(event) {
+        showAll();
+      });
+
+      $('#clear-button').click(function(event) {
+        deleteAll();
+      });
+
+      $('#delete-button').click(function(event) {
+        var id = $('#id-to-delete').val();
+        deleteByISBN(id);
+      });
+
+    }
+
+    </script>
+  </head>
+  <body onload="startTests()" style="margin:20px;">
+
+    <div class="panel panel-primary">
+      <div class="panel-heading">Book management</div>
+      <div class="panel-body">
+        <div class="col-md-4">
+          <buton type="button" id="add-button" class="btn btn-default">Add new</buton>
+          <button type="button" id="clear-button" class="btn btn-default">Delete all data</button>
+          <button type="button" id="all-button" class="btn btn-default">Show all data</button>
+        </div>
+        <div class="col-md-8">
+          <div class="input-group">
+            <input type="text" id="id-to-delete" class="form-control" placeholder="ISBN to delete">
+            <span class="input-group-btn">
+              <button class="btn btn-default" id="delete-button" type="button">Delete</button>
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <table class="table">
+        <thead>
+          <tr>
+            <th>ISBN</th>
+            <th>Title</th>
+            <th>Author</th>
+          </tr>
+        </thead>
+        <tbody id="data-list">
+        </tbody>
+      </table>
+
+      <!-- <ul id="data-list" class="list-group"> -->
+
+      </ul>
+    </div>
+
+    
+
+    
+
+
+  </body>
+</html>
