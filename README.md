@@ -8,7 +8,9 @@ This IndexedDB polyfill exposes the IndexedDB API in unsupported browsers using 
 
 More details of IndexedDB browsers support can be found in this graph:
 
-![pic](http://media-cache-ec0.pinimg.com/originals/d9/7b/b8/d97bb83436eb838b05e9ee213216be00.jpg)
+![pic](https://dl.dropboxusercontent.com/u/107773577/Blog%20pics/Screen%20Shot%202014-08-25%20at%2011.29.51%20AM.png)
+
+The latest support condition can be found here: [http://caniuse.com/#search=IndexedDB](http://caniuse.com/#search=IndexedDB)
 
 Using this polyfill, you can use a single offline storage API across browsers (Opera, Safari, Firefox, Chrome and IE10) and even mobile devices (Phonegap on iOS and Android).
 
